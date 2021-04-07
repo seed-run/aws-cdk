@@ -1,6 +1,7 @@
 import * as cxapi from '@aws-cdk/cx-api';
 import * as colors from 'colors/safe';
 import * as uuid from 'uuid';
+import * as fs from 'fs-extra';
 import { addMetadataAssetsToManifest } from '../assets';
 import { Tag } from '../cdk-toolkit';
 import { debug, error, print } from '../logging';
@@ -233,6 +234,21 @@ export async function deployStack(options: DeployStackOptions): Promise<DeploySt
   const bodyParameter = await makeBodyParameter(stackArtifact, options.resolvedEnvironment, legacyAssets, options.toolkitInfo);
 
   await publishAssets(legacyAssets.toManifest(stackArtifact.assembly.directory), options.sdkProvider, stackEnv);
+
+  // If SEED_UPDATE_CDK_ASSETS is configured, upload the assets and skip the deployment.
+  if (process.env.SEED_UPDATE_CDK_ASSETS) {
+    const params = JSON.stringify({
+      isUpdate: cloudFormationStack.exists && cloudFormationStack.stackStatus.name !== 'REVIEW_IN_PROGRESS',
+      StackName: deployName,
+      TemplateBody: bodyParameter.TemplateBody,
+      TemplateURL: bodyParameter.TemplateURL,
+      Parameters: stackParams.apiParameters,
+      Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND'],
+      Tags: options.tags,
+    });
+    fs.writeFileSync(`${process.env.SEED_UPDATE_CDK_ASSETS}/${deployName}.command`, params);
+    return { noOp: true, outputs: cloudFormationStack.outputs, stackArn: cloudFormationStack.stackId, stackArtifact };
+  }
 
   const changeSetName = options.changeSetName || 'cdk-deploy-change-set';
   if (cloudFormationStack.exists) {
