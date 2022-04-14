@@ -268,6 +268,22 @@ export async function deployStack(options: DeployStackOptions): Promise<DeploySt
     options.overrideTemplate);
   await publishAssets(legacyAssets.toManifest(stackArtifact.assembly.directory), options.sdkProvider, stackEnv);
 
+  // If SEED_UPDATE_CDK_ASSETS is configured, upload the assets and skip the deployment.
+  if (process.env.SEED_UPDATE_CDK_ASSETS) {
+    fs.writeJsonSync(`${process.env.SEED_UPDATE_CDK_ASSETS}/${deployName}.command`, {
+      isUpdate: cloudFormationStack.exists && cloudFormationStack.stackStatus.name !== 'REVIEW_IN_PROGRESS',
+      params: {
+        StackName: deployName,
+        TemplateBody: bodyParameter.TemplateBody,
+        TemplateURL: bodyParameter.TemplateURL,
+        Parameters: stackParams.apiParameters,
+        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND'],
+        Tags: options.tags,
+      },
+    });
+    return { noOp: true, outputs: {}, stackArn: '' };
+  }
+
   if (options.hotswap) {
     // attempt to short-circuit the deployment if possible
     try {
