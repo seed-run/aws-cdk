@@ -5,7 +5,7 @@ const { readFileSync, writeFileSync } = require('fs');
 const code = process.argv[2];
 
 // Get forked AWS CDK version
-const cdkVersion = JSON.parse(readFileSync('version.v1.json')).version;
+const cdkVersion = JSON.parse(readFileSync('version.v2.json')).version;
 
 // Use real versions
 execSync(`scripts/align-version.sh`);
